@@ -7,56 +7,256 @@
 </head>
 <body class="bg-gradient-to-r from-green-100 to-emerald-200 flex items-center justify-center h-screen">
   <div class="bg-white p-8 rounded-2xl shadow-2xl w-full max-w-lg border-t-8 border-green-500">
-    <!-- Header -->
     <div class="flex items-center space-x-3 mb-6">
       <h1 class="text-2xl font-bold text-green-700">🥑 NutriBot</h1>
     </div>
     <p class="text-gray-600 mb-4">Ask me about your diet, health & food choices 🍎</p>
 
-    <!-- Chat Box -->
+    <!-- Debug info panel -->
+    <div id="debug-info" class="bg-yellow-50 border border-yellow-200 rounded p-2 mb-4 text-xs text-yellow-800" style="display: none;">
+      <strong>Debug Info:</strong>
+      <div id="debug-text"></div>
+    </div>
+
     <div id="chat-box" class="h-72 overflow-y-auto border border-green-200 p-4 rounded-lg mb-4 bg-green-50">
       <p class="text-gray-400 text-center italic">Start your healthy conversation...</p>
     </div>
 
-    <!-- Input -->
     <div class="flex space-x-2">
       <input id="user-input" type="text" 
              placeholder="E.g. What should I eat for breakfast?" 
-             class="flex-1 border border-green-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-green-400 focus:outline-none">
+             class="flex-1 border border-green-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-green-400 focus:outline-none"
+             onkeypress="handleKeyPress(event)">
+      
+      <button id="mic-btn" onclick="startSpeechRecognition()" 
+              class="bg-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-400 transition flex items-center justify-center"
+              title="Click to speak">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M12 14c1.66 0 2.99-1.34 2.99-3L15 5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm5.3-3c0 3-2.54 5.1-5.3 5.1S6.7 14 6.7 11H5c0 3.41 2.72 6.23 6 6.72V21h2v-3.28c3.28-.48 6-3.3 6-6.72h-1.7z"/>
+        </svg>
+      </button>
+      
       <button onclick="sendMessage()" 
               class="bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600 transition">
         Ask
       </button>
     </div>
+
+    <!-- Toggle debug button -->
+    <button onclick="toggleDebug()" class="mt-2 text-xs text-gray-500 hover:text-gray-700">
+      Toggle Debug Info
+    </button>
   </div>
 
   <script>
+    const userInput = document.getElementById("user-input");
+    const chatBox = document.getElementById("chat-box");
+    const micBtn = document.getElementById("mic-btn");
+    const debugInfo = document.getElementById("debug-info");
+    const debugText = document.getElementById("debug-text");
+
+    let isListening = false;
+    let recognition = null;
+
+    function toggleDebug() {
+      debugInfo.style.display = debugInfo.style.display === 'none' ? 'block' : 'none';
+    }
+
+    function addDebugInfo(message) {
+      console.log("Debug:", message);
+      debugText.innerHTML += message + "<br>";
+      debugInfo.scrollTop = debugInfo.scrollHeight;
+    }
+
+    function handleKeyPress(event) {
+      if (event.key === 'Enter') {
+        sendMessage();
+      }
+    }
+
     async function sendMessage() {
-      const input = document.getElementById("user-input");
-      const message = input.value.trim();
+      const message = userInput.value.trim();
       if (!message) return;
 
-      const chatBox = document.getElementById("chat-box");
+      if (chatBox.querySelector('.italic')) {
+        chatBox.innerHTML = '';
+      }
+      
       chatBox.innerHTML += `
         <div class='text-right text-green-700 mb-2'>
           <b>You:</b> ${message}
         </div>`;
 
-      input.value = "";
+      userInput.value = "";
+      chatBox.scrollTop = chatBox.scrollHeight;
 
-      const response = await fetch("/get_response", {
-        method: "POST",
-        headers: {"Content-Type": "application/json"},
-        body: JSON.stringify({prompt: message})
-      });
-
-      const data = await response.json();
       chatBox.innerHTML += `
-        <div class='text-left text-gray-700 mb-2'>
-          <b>NutriBot:</b> ${data.response}
+        <div class='text-left text-gray-500 mb-2' id='loading'>
+          <b>NutriBot:</b> <span class="animate-pulse">Thinking...</span>
         </div>`;
       chatBox.scrollTop = chatBox.scrollHeight;
+
+      try {
+        const response = await fetch("/get_response", {
+          method: "POST",
+          headers: {"Content-Type": "application/json"},
+          body: JSON.stringify({prompt: message})
+        });
+
+        const data = await response.json();
+        document.getElementById('loading').remove();
+        
+        chatBox.innerHTML += `
+          <div class='text-left text-gray-700 mb-2'>
+            <b>NutriBot:</b> ${data.response}
+          </div>`;
+        chatBox.scrollTop = chatBox.scrollHeight;
+      } catch (error) {
+        document.getElementById('loading').remove();
+        chatBox.innerHTML += `
+          <div class='text-left text-red-600 mb-2'>
+            <b>Error:</b> Unable to get response. Please try again.
+          </div>`;
+        chatBox.scrollTop = chatBox.scrollHeight;
+      }
     }
+
+    function resetMicButton() {
+      micBtn.classList.remove('bg-red-500', 'hover:bg-red-600', 'animate-pulse');
+      micBtn.classList.add('bg-gray-300', 'hover:bg-gray-400');
+      micBtn.innerHTML = `
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M12 14c1.66 0 2.99-1.34 2.99-3L15 5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm5.3-3c0 3-2.54 5.1-5.3 5.1S6.7 14 6.7 11H5c0 3.41 2.72 6.23 6 6.72V21h2v-3.28c3.28-.48 6-3.3 6-6.72h-1.7z"/>
+        </svg>
+      `;
+      userInput.placeholder = "E.g. What should I eat for breakfast?";
+      isListening = false;
+    }
+
+    function startSpeechRecognition() {
+      // Prevent multiple instances
+      if (isListening) {
+        addDebugInfo("Already listening, ignoring click");
+        return;
+      }
+
+      // Check for HTTPS
+      if (location.protocol !== 'https:' && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') {
+        alert("Speech recognition requires HTTPS or localhost. Current URL: " + location.href);
+        addDebugInfo("Not HTTPS: " + location.protocol + "//" + location.hostname);
+        return;
+      }
+
+      // Check browser support
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (!SpeechRecognition) {
+        alert("Speech recognition not supported in this browser. Try Chrome, Edge, or Safari.");
+        addDebugInfo("SpeechRecognition not available");
+        return;
+      }
+
+      addDebugInfo("Starting speech recognition...");
+      isListening = true;
+
+      recognition = new SpeechRecognition();
+      
+      // Enhanced settings
+      recognition.continuous = false;  // Stop after one result
+      recognition.interimResults = false; // Only final results
+      recognition.lang = 'en-US';
+      recognition.maxAlternatives = 1;
+
+      // Start listening visual feedback
+      micBtn.classList.remove('bg-gray-300', 'hover:bg-gray-400');
+      micBtn.classList.add('bg-red-500', 'hover:bg-red-600', 'animate-pulse');
+      micBtn.innerHTML = `🎤`;
+      userInput.placeholder = "🎤 Listening... Speak now!";
+
+      recognition.onstart = function() {
+        addDebugInfo("Recognition started successfully");
+      };
+
+      recognition.onend = function() {
+        addDebugInfo("Recognition ended");
+        resetMicButton();
+      };
+
+      recognition.onerror = function(event) {
+        addDebugInfo("Error occurred: " + event.error);
+        
+        let errorMessage = "";
+        switch(event.error) {
+          case 'no-speech':
+            errorMessage = "No speech detected. Please try speaking closer to the microphone.";
+            break;
+          case 'audio-capture':
+            errorMessage = "Microphone not found or permission denied.";
+            break;
+          case 'not-allowed':
+            errorMessage = "Microphone permission denied. Please allow microphone access.";
+            break;
+          case 'network':
+            errorMessage = "Network error occurred.";
+            break;
+          case 'service-not-allowed':
+            errorMessage = "Speech service not allowed. Try using HTTPS.";
+            break;
+          default:
+            errorMessage = `Speech recognition error: ${event.error}`;
+        }
+        
+        alert(errorMessage);
+        resetMicButton();
+      };
+
+      recognition.onresult = function(event) {
+        const transcript = event.results[0][0].transcript;
+        const confidence = event.results[0][0].confidence;
+        
+        addDebugInfo(`Result: "${transcript}" (confidence: ${confidence.toFixed(2)})`);
+        
+        userInput.value = transcript;
+        
+        if (chatBox.querySelector('.italic')) {
+          chatBox.innerHTML = '';
+        }
+        
+        chatBox.innerHTML += `
+          <div class='text-blue-600 mb-2 italic text-sm'>
+            🎤 Recognized: "${transcript}"
+          </div>`;
+        chatBox.scrollTop = chatBox.scrollHeight;
+        
+        // Auto-send after a short delay
+        setTimeout(() => {
+          sendMessage();
+        }, 1000);
+      };
+
+      // Start recognition
+      try {
+        recognition.start();
+        addDebugInfo("Recognition.start() called");
+      } catch (error) {
+        addDebugInfo("Error starting recognition: " + error.message);
+        resetMicButton();
+      }
+    }
+
+    // Check browser compatibility on page load
+    window.addEventListener('load', function() {
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      addDebugInfo("Page loaded");
+      addDebugInfo("Browser: " + navigator.userAgent);
+      addDebugInfo("Protocol: " + location.protocol);
+      addDebugInfo("SpeechRecognition available: " + !!SpeechRecognition);
+      
+      if (SpeechRecognition) {
+        addDebugInfo("Speech recognition should work!");
+      } else {
+        addDebugInfo("Speech recognition NOT supported");
+      }
+    });
   </script>
 </body>
 </html>
