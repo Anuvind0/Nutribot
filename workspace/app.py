@@ -9,7 +9,7 @@ greet=["hi","hello","hey","thanks","thnx","thank you","goodbye","bye","good morn
 def generate(prompt):
     client = genai.Client(api_key="AIzaSyAa5L6im7IW05I3fJRFGhsnDOVB-HVL1zk")
     response = client.models.generate_content(
-    model="gemini-1.5-flash", contents=prompt+" generate the answer in a one or two sentance")
+    model="gemini-2.5-flash-lite", contents=prompt+" generate the answer in a one or two sentance regarding nutrition")
     print(type(response))
     y=response.text
     return y
@@ -17,7 +17,7 @@ def check(prompt):
     pt=f'"{prompt}"'
     client = genai.Client(api_key="AIzaSyAa5L6im7IW05I3fJRFGhsnDOVB-HVL1zk")
     response = client.models.generate_content(
-    model="gemini-1.5-flash", contents=pt+" can you check if this prompt is related to nutrition or nutrition related topics or  not,Just give me a single yes or no")
+    model="gemini-2.5-flash-lite", contents=pt+" can you check if this prompt is related to nutrition or nutrition related topics or food choices not,Just give me a single yes or no")
     print(response)
     y=response.text
     if y.lower().strip() == "yes":
